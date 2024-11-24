@@ -12,6 +12,7 @@ use {
         DrawImage, DrawLinearGradient, DrawRadialGradient, DrawSweepGradient, Glyph, GlyphRun,
         Patch,
     },
+    peniko::color::{DynamicColor, Srgb},
     peniko::{ColorStop, Extend, GradientKind, Image},
     skrifa::instance::NormalizedCoord,
 };
@@ -355,7 +356,9 @@ impl Encoding {
     ) {
         match self.add_ramp(color_stops, alpha, extend) {
             RampStops::Empty => self.encode_color(DrawColor::new(Color::TRANSPARENT)),
-            RampStops::One(color) => self.encode_color(DrawColor::new(color)),
+            RampStops::One(color) => {
+                self.encode_color(DrawColor::new(color.to_alpha_color::<Srgb>()));
+            }
             _ => {
                 self.draw_tags.push(DrawTag::LINEAR_GRADIENT);
                 self.draw_data
@@ -381,7 +384,9 @@ impl Encoding {
         }
         match self.add_ramp(color_stops, alpha, extend) {
             RampStops::Empty => self.encode_color(DrawColor::new(Color::TRANSPARENT)),
-            RampStops::One(color) => self.encode_color(DrawColor::new(color)),
+            RampStops::One(color) => {
+                self.encode_color(DrawColor::new(color.to_alpha_color::<Srgb>()));
+            }
             _ => {
                 self.draw_tags.push(DrawTag::RADIAL_GRADIENT);
                 self.draw_data
@@ -406,7 +411,9 @@ impl Encoding {
         }
         match self.add_ramp(color_stops, alpha, extend) {
             RampStops::Empty => self.encode_color(DrawColor::new(Color::TRANSPARENT)),
-            RampStops::One(color) => self.encode_color(DrawColor::new(color)),
+            RampStops::One(color) => {
+                self.encode_color(DrawColor::new(color.to_alpha_color::<Srgb>()));
+            }
             _ => {
                 self.draw_tags.push(DrawTag::SWEEP_GRADIENT);
                 self.draw_data
@@ -418,7 +425,7 @@ impl Encoding {
     /// Encodes an image brush.
     #[cfg(feature = "full")]
     pub fn encode_image(&mut self, image: &Image, alpha: f32) {
-        let _alpha = alpha * f32::from(image.alpha);
+        let _alpha = alpha * image.alpha;
         // TODO: feed the alpha multiplier through the full pipeline for consistency
         // with other brushes?
         // Tracked in https://github.com/linebender/vello/issues/692
@@ -527,7 +534,7 @@ enum RampStops {
     /// Color stop sequence was empty.
     Empty,
     /// Contained a single color stop.
-    One(Color),
+    One(DynamicColor),
     /// More than one color stop.
     Many,
 }

@@ -6,6 +6,7 @@ mod bitmap;
 use std::sync::Arc;
 
 use peniko::{
+    color::{DynamicColor, Srgb},
     kurbo::{Affine, BezPath, Point, Rect, Shape, Stroke, Vec2},
     BlendMode, Blob, Brush, BrushRef, Color, ColorStop, ColorStops, ColorStopsSource, Compose,
     Extend, Fill, Font, Gradient, Image, Mix, StyleRef,
@@ -987,7 +988,7 @@ fn color_index(cpal: &'_ Cpal<'_>, palette_index: u16) -> Option<Color> {
     let actual_colors = cpal.color_records_array().unwrap().unwrap();
     // TODO: Error reporting in the `None` case
     let color = actual_colors.get(usize::from(palette_index))?;
-    Some(Color::rgba8(
+    Some(Color::from_rgba8(
         color.red,
         color.green,
         color.blue,
@@ -1027,14 +1028,14 @@ impl ColorStopsSource for ColorStopsConverter<'_> {
                     BrushRef::Gradient(grad) => grad
                         .stops
                         .first()
-                        .map(|it| it.color)
+                        .map(|it| it.color.to_alpha_color::<Srgb>())
                         .unwrap_or(Color::TRANSPARENT),
                     BrushRef::Image(_) => Color::BLACK,
                 },
             };
             let color = color.multiply_alpha(item.alpha);
             vec.push(ColorStop {
-                color,
+                color: DynamicColor::from_alpha_color(color),
                 offset: item.offset,
             });
         }

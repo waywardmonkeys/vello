@@ -74,7 +74,7 @@ impl DrawColor {
     /// Creates new solid color draw data.
     pub fn new(color: Color) -> Self {
         Self {
-            rgba: color.to_premul_u32(),
+            rgba: color.premultiply().to_rgba8().to_u32(),
         }
     }
 }

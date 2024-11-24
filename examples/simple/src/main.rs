@@ -210,12 +210,12 @@ fn add_shapes_to_scene(scene: &mut Scene) {
     // Draw an outlined rectangle
     let stroke = Stroke::new(6.0);
     let rect = RoundedRect::new(10.0, 10.0, 240.0, 240.0, 20.0);
-    let rect_stroke_color = Color::rgb(0.9804, 0.702, 0.5294);
+    let rect_stroke_color = Color::new([0.9804, 0.702, 0.5294, 1.]);
     scene.stroke(&stroke, Affine::IDENTITY, rect_stroke_color, None, &rect);
 
     // Draw a filled circle
     let circle = Circle::new((420.0, 200.0), 120.0);
-    let circle_fill_color = Color::rgb(0.9529, 0.5451, 0.6588);
+    let circle_fill_color = Color::new([0.9529, 0.5451, 0.6588, 1.]);
     scene.fill(
         vello::peniko::Fill::NonZero,
         Affine::IDENTITY,
@@ -226,7 +226,7 @@ fn add_shapes_to_scene(scene: &mut Scene) {
 
     // Draw a filled ellipse
     let ellipse = Ellipse::new((250.0, 420.0), (100.0, 160.0), -90.0);
-    let ellipse_fill_color = Color::rgb(0.7961, 0.651, 0.9686);
+    let ellipse_fill_color = Color::new([0.7961, 0.651, 0.9686, 1.]);
     scene.fill(
         vello::peniko::Fill::NonZero,
         Affine::IDENTITY,
@@ -237,6 +237,6 @@ fn add_shapes_to_scene(scene: &mut Scene) {
 
     // Draw a straight line
     let line = Line::new((260.0, 20.0), (620.0, 100.0));
-    let line_stroke_color = Color::rgb(0.5373, 0.7059, 0.9804);
+    let line_stroke_color = Color::new([0.5373, 0.7059, 0.9804, 1.]);
     scene.stroke(&stroke, Affine::IDENTITY, line_stroke_color, None, &line);
 }
