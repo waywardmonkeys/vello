@@ -12,7 +12,7 @@ use {
         DrawImage, DrawLinearGradient, DrawRadialGradient, DrawSweepGradient, Glyph, GlyphRun,
         Patch,
     },
-    peniko::color::{DynamicColor, Srgb},
+    peniko::color::DynamicColor,
     peniko::{ColorStop, Extend, GradientKind, Image},
     skrifa::instance::NormalizedCoord,
 };
@@ -275,7 +275,7 @@ impl Encoding {
                 } else {
                     color
                 };
-                self.encode_color(DrawColor::new(color));
+                self.encode_color(color);
             }
             #[cfg(feature = "full")]
             BrushRef::Gradient(gradient) => match gradient.kind {
@@ -340,7 +340,8 @@ impl Encoding {
     }
 
     /// Encodes a solid color brush.
-    pub fn encode_color(&mut self, color: DrawColor) {
+    pub fn encode_color(&mut self, color: impl Into<DrawColor>) {
+        let color = color.into();
         self.draw_tags.push(DrawTag::COLOR);
         self.draw_data.extend_from_slice(bytemuck::bytes_of(&color));
     }
@@ -355,9 +356,9 @@ impl Encoding {
         extend: Extend,
     ) {
         match self.add_ramp(color_stops, alpha, extend) {
-            RampStops::Empty => self.encode_color(DrawColor::new(Color::TRANSPARENT)),
+            RampStops::Empty => self.encode_color(Color::TRANSPARENT),
             RampStops::One(color) => {
-                self.encode_color(DrawColor::new(color.to_alpha_color::<Srgb>()));
+                self.encode_color(color);
             }
             _ => {
                 self.draw_tags.push(DrawTag::LINEAR_GRADIENT);
@@ -379,14 +380,12 @@ impl Encoding {
         // Match Skia's epsilon for radii comparison
         const SKIA_EPSILON: f32 = 1.0 / (1 << 12) as f32;
         if gradient.p0 == gradient.p1 && (gradient.r0 - gradient.r1).abs() < SKIA_EPSILON {
-            self.encode_color(DrawColor::new(Color::TRANSPARENT));
+            self.encode_color(Color::TRANSPARENT);
             return;
         }
         match self.add_ramp(color_stops, alpha, extend) {
-            RampStops::Empty => self.encode_color(DrawColor::new(Color::TRANSPARENT)),
-            RampStops::One(color) => {
-                self.encode_color(DrawColor::new(color.to_alpha_color::<Srgb>()));
-            }
+            RampStops::Empty => self.encode_color(Color::TRANSPARENT),
+            RampStops::One(color) => self.encode_color(color),
             _ => {
                 self.draw_tags.push(DrawTag::RADIAL_GRADIENT);
                 self.draw_data
@@ -406,14 +405,12 @@ impl Encoding {
     ) {
         const SKIA_DEGENERATE_THRESHOLD: f32 = 1.0 / (1 << 15) as f32;
         if (gradient.t0 - gradient.t1).abs() < SKIA_DEGENERATE_THRESHOLD {
-            self.encode_color(DrawColor::new(Color::TRANSPARENT));
+            self.encode_color(Color::TRANSPARENT);
             return;
         }
         match self.add_ramp(color_stops, alpha, extend) {
-            RampStops::Empty => self.encode_color(DrawColor::new(Color::TRANSPARENT)),
-            RampStops::One(color) => {
-                self.encode_color(DrawColor::new(color.to_alpha_color::<Srgb>()));
-            }
+            RampStops::Empty => self.encode_color(Color::TRANSPARENT),
+            RampStops::One(color) => self.encode_color(color),
             _ => {
                 self.draw_tags.push(DrawTag::SWEEP_GRADIENT);
                 self.draw_data
@@ -453,7 +450,7 @@ impl Encoding {
         self.draw_tags.push(DrawTag::BLUR_RECT);
         self.draw_data
             .extend_from_slice(bytemuck::bytes_of(&DrawBlurRoundedRect {
-                color: DrawColor::new(color),
+                color: color.into(),
                 width,
                 height,
                 radius,
