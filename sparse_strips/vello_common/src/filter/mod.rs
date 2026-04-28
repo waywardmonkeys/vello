@@ -46,24 +46,39 @@ impl PreparedFilter {
                 Self::Flood(flood)
             }
             FilterPrimitive::GaussianBlur {
-                std_deviation,
+                std_deviation_x,
+                std_deviation_y,
                 edge_mode,
             } => {
-                let scaled_std_dev = transform_blur_params(*std_deviation, transform);
-                let blur = GaussianBlur::new(scaled_std_dev, *edge_mode);
+                let (scaled_std_dev_x, scaled_std_dev_y) =
+                    transform_blur_params(*std_deviation_x, *std_deviation_y, transform);
+                let blur = GaussianBlur::new(scaled_std_dev_x, scaled_std_dev_y, *edge_mode);
                 Self::GaussianBlur(blur)
             }
             FilterPrimitive::DropShadow {
                 dx,
                 dy,
-                std_deviation,
+                std_deviation_x,
+                std_deviation_y,
                 color,
                 edge_mode,
             } => {
-                let (scaled_dx, scaled_dy, scaled_std_dev) =
-                    transform_shadow_params(*dx, *dy, *std_deviation, transform);
-                let drop_shadow =
-                    DropShadow::new(scaled_dx, scaled_dy, scaled_std_dev, *edge_mode, *color);
+                let (scaled_dx, scaled_dy, scaled_std_dev_x, scaled_std_dev_y) =
+                    transform_shadow_params(
+                        *dx,
+                        *dy,
+                        *std_deviation_x,
+                        *std_deviation_y,
+                        transform,
+                    );
+                let drop_shadow = DropShadow::new(
+                    scaled_dx,
+                    scaled_dy,
+                    scaled_std_dev_x,
+                    scaled_std_dev_y,
+                    *edge_mode,
+                    *color,
+                );
 
                 Self::DropShadow(drop_shadow)
             }

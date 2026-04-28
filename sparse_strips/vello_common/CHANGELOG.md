@@ -15,6 +15,10 @@ You can find its changes [documented below](#007---2026-03-24).
 
 This release has an [MSRV][] of 1.88.
 
+### Changed
+
+- Breaking change: `FilterPrimitive::GaussianBlur` and `FilterPrimitive::DropShadow` now use separate `std_deviation_x` and `std_deviation_y` fields instead of a single `std_deviation`.
+
 ### Optimized
 
 - Performance of clipped drawing by culling geometry outside the clip bounding box during flattening. ([#1519][] by [@tomcur][])

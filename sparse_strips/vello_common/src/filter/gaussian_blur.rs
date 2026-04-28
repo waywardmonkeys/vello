@@ -12,24 +12,25 @@ use core::f32::consts::E;
 #[cfg(not(feature = "std"))]
 use peniko::kurbo::common::FloatFuncs as _;
 
-/// Scale a blur's standard deviation uniformly based on the transformation.
+/// Scale a blur's standard deviations based on the transformation.
 ///
 /// Extracts the scale factors from the transformation matrix using SVD and
-/// averages them to get a uniform scale factor for the blur radius.
+/// applies them to the x and y standard deviations.
 ///
 /// # Arguments
-/// * `std_deviation` - The blur standard deviation in user space
+/// * `std_deviation_x` - The x-axis blur standard deviation in user space
+/// * `std_deviation_y` - The y-axis blur standard deviation in user space
 /// * `transform` - The transformation matrix to extract scale from
 ///
 /// # Returns
-/// The scaled standard deviation in device space
-pub(crate) fn transform_blur_params(std_deviation: f32, transform: &Affine) -> f32 {
+/// The scaled x and y standard deviations in device space.
+pub(crate) fn transform_blur_params(
+    std_deviation_x: f32,
+    std_deviation_y: f32,
+    transform: &Affine,
+) -> (f32, f32) {
     let (scale_x, scale_y) = extract_scales(transform);
-    let uniform_scale = (scale_x + scale_y) / 2.0;
-    // TODO: Support separate std_deviation for x and y axes (std_deviation_x, std_deviation_y)
-    // to properly handle non-uniform scaling. This would eliminate the need for uniform_scale
-    // and allow blur to scale independently along each axis.
-    std_deviation * uniform_scale
+    (std_deviation_x * scale_x, std_deviation_y * scale_y)
 }
 
 /// Maximum size of the Gaussian kernel (must be odd and equal to or smaller than [`u8::MAX`]).
@@ -53,32 +54,46 @@ const _: () = const {
 /// A gaussian blur.
 #[derive(Debug)]
 pub struct GaussianBlur {
-    /// The standard deviation.
-    pub std_deviation: f32,
-    /// Number of 2× decimation levels to use (0 means no decimation, direct convolution).
-    pub n_decimations: usize,
-    /// Pre-computed Gaussian kernel weights for the reduced blur.
-    /// Only the first `kernel_size` elements are valid.
-    pub kernel: [f32; MAX_KERNEL_SIZE],
-    /// Actual length of the kernel (rest is padding up to `MAX_KERNEL_SIZE`).
-    pub kernel_size: u8,
+    /// The x-axis standard deviation.
+    pub std_deviation_x: f32,
+    /// The y-axis standard deviation.
+    pub std_deviation_y: f32,
+    /// Number of 2× x-axis decimation levels to use.
+    pub n_decimations_x: usize,
+    /// Number of 2× y-axis decimation levels to use.
+    pub n_decimations_y: usize,
+    /// Pre-computed Gaussian kernel weights for the reduced x-axis blur.
+    /// Only the first `kernel_size_x` elements are valid.
+    pub kernel_x: [f32; MAX_KERNEL_SIZE],
+    /// Pre-computed Gaussian kernel weights for the reduced y-axis blur.
+    /// Only the first `kernel_size_y` elements are valid.
+    pub kernel_y: [f32; MAX_KERNEL_SIZE],
+    /// Actual length of the x-axis kernel.
+    pub kernel_size_x: u8,
+    /// Actual length of the y-axis kernel.
+    pub kernel_size_y: u8,
     /// Edge mode for handling out-of-bounds sampling.
     pub edge_mode: EdgeMode,
 }
 
 impl GaussianBlur {
-    /// Create a new Gaussian blur filter with the specified standard deviation.
+    /// Create a new Gaussian blur filter with the specified standard deviations.
     ///
-    /// This precomputes the decimation plan, kernel, and radius for optimal performance.
-    pub fn new(std_deviation: f32, edge_mode: EdgeMode) -> Self {
-        let (n_decimations, kernel, kernel_size) = plan_decimated_blur(std_deviation);
+    /// This precomputes the per-axis decimation plans and kernels for optimal performance.
+    pub fn new(std_deviation_x: f32, std_deviation_y: f32, edge_mode: EdgeMode) -> Self {
+        let (n_decimations_x, kernel_x, kernel_size_x) = plan_decimated_blur(std_deviation_x);
+        let (n_decimations_y, kernel_y, kernel_size_y) = plan_decimated_blur(std_deviation_y);
 
         Self {
-            std_deviation,
+            std_deviation_x,
+            std_deviation_y,
             edge_mode,
-            n_decimations,
-            kernel,
-            kernel_size,
+            n_decimations_x,
+            n_decimations_y,
+            kernel_x,
+            kernel_y,
+            kernel_size_x,
+            kernel_size_y,
         }
     }
 }
@@ -202,12 +217,46 @@ impl DecimationSizer {
         (self.width, self.height)
     }
 
+    /// Apply a new x-axis downscale operation.
+    #[inline]
+    pub fn downscale_x(&mut self) -> (u16, u16) {
+        self.dim_stack.push((self.width, self.height));
+        self.width = self.width.div_ceil(2);
+        (self.width, self.height)
+    }
+
+    /// Apply a new y-axis downscale operation.
+    #[inline]
+    pub fn downscale_y(&mut self) -> (u16, u16) {
+        self.dim_stack.push((self.width, self.height));
+        self.height = self.height.div_ceil(2);
+        (self.width, self.height)
+    }
+
     /// Apply a new upscale operation.
     #[inline]
     pub fn upscale(&mut self) -> (u16, u16) {
         let (target_w, target_h) = self.dim_stack.pop().unwrap();
         // Clamp because upscale can exceed target on odd dimensions (e.g., 5→3→6 > 5)
         self.width = (self.width * 2).min(target_w);
+        self.height = (self.height * 2).min(target_h);
+        (self.width, self.height)
+    }
+
+    /// Apply a new x-axis upscale operation.
+    #[inline]
+    pub fn upscale_x(&mut self) -> (u16, u16) {
+        let (target_w, target_h) = self.dim_stack.pop().unwrap();
+        self.width = (self.width * 2).min(target_w);
+        self.height = target_h;
+        (self.width, self.height)
+    }
+
+    /// Apply a new y-axis upscale operation.
+    #[inline]
+    pub fn upscale_y(&mut self) -> (u16, u16) {
+        let (target_w, target_h) = self.dim_stack.pop().unwrap();
+        self.width = target_w;
         self.height = (self.height * 2).min(target_h);
         (self.width, self.height)
     }

@@ -164,7 +164,8 @@ impl ExampleScene for FilterElementsScene {
                     FilterKind::None => unreachable!(),
                     FilterKind::Blur { std_deviation } => {
                         Filter::from_primitive(FilterPrimitive::GaussianBlur {
-                            std_deviation,
+                            std_deviation_x: std_deviation,
+                            std_deviation_y: std_deviation,
                             edge_mode: EdgeMode::None,
                         })
                     }
@@ -172,7 +173,8 @@ impl ExampleScene for FilterElementsScene {
                         Filter::from_primitive(FilterPrimitive::DropShadow {
                             dx: 12.0,
                             dy: 12.0,
-                            std_deviation,
+                            std_deviation_x: std_deviation,
+                            std_deviation_y: std_deviation,
                             color: vello_common::color::AlphaColor::from_rgba8(255, 255, 255, 220),
                             edge_mode: EdgeMode::None,
                         })

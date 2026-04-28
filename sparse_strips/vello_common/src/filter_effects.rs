@@ -77,7 +77,8 @@ impl Filter {
         // Convert function to primitive
         let primitive = match function {
             FilterFunction::Blur { radius } => FilterPrimitive::GaussianBlur {
-                std_deviation: radius,
+                std_deviation_x: radius,
+                std_deviation_y: radius,
                 edge_mode: EdgeMode::default(),
             },
             _ => unimplemented!("Filter function {:?} not supported", function),
@@ -361,22 +362,17 @@ pub enum FilterPrimitive {
     },
     /// Gaussian blur filter.
     ///
-    /// Applies a Gaussian blur using the specified standard deviation (σ).
+    /// Applies a Gaussian blur using the specified standard deviations (σ).
     /// The effective blur range (distance over which pixels are sampled) is
-    /// approximately 3 × `std_deviation`, as this captures ~99.7% of the
+    /// approximately 3 × each standard deviation, as this captures ~99.7% of the
     /// Gaussian distribution.
     GaussianBlur {
-        /// Standard deviation for the blur kernel. Larger values create more blur.
+        /// Standard deviation for the blur kernel along the x axis, in user space units.
         /// Must be non-negative. A value of 0 means no blur.
-        ///
-        /// This directly corresponds to the σ (sigma) parameter in the Gaussian
-        /// function. The visible blur effect extends approximately 3σ in each direction.
-        ///
-        /// TODO: Per the W3C specification, this should support separate x and y values.
-        /// The spec allows `stdDeviation` to be either one number (applied to both axes)
-        /// or two numbers (first for x-axis, second for y-axis). Currently only uniform
-        /// blur is supported. Consider changing to `(f32, f32)` or a dedicated type.
-        std_deviation: f32,
+        std_deviation_x: f32,
+        /// Standard deviation for the blur kernel along the y axis, in user space units.
+        /// Must be non-negative. A value of 0 means no blur.
+        std_deviation_y: f32,
         /// Edge mode determining how pixels beyond the input bounds are handled.
         edge_mode: EdgeMode,
     },
@@ -388,12 +384,14 @@ pub enum FilterPrimitive {
     ///
     /// See: <https://drafts.fxtf.org/filter-effects-2/#feDropShadowElement>
     DropShadow {
-        /// Horizontal offset of the shadow in pixels. Positive values shift right.
+        /// Horizontal offset of the shadow in user space units. Positive values shift right.
         dx: f32,
-        /// Vertical offset of the shadow in pixels. Positive values shift down.
+        /// Vertical offset of the shadow in user space units. Positive values shift down.
         dy: f32,
-        /// Blur standard deviation for the shadow. Larger values create softer shadows.
-        std_deviation: f32,
+        /// Blur standard deviation for the shadow along the x axis, in user space units.
+        std_deviation_x: f32,
+        /// Blur standard deviation for the shadow along the y axis, in user space units.
+        std_deviation_y: f32,
         /// Shadow color with alpha channel. Alpha controls shadow opacity.
         color: AlphaColor<Srgb>,
         /// Edge mode for handling boundaries during blur operation.
@@ -564,10 +562,15 @@ impl FilterPrimitive {
     /// Most filters that don't sample neighboring pixels return `Rect::ZERO`.
     pub fn expansion_rect(&self) -> Rect {
         match self {
-            Self::GaussianBlur { std_deviation, .. } => {
-                // Gaussian blur expands uniformly by 3*sigma (covers 99.7% of distribution)
-                let radius = (*std_deviation * 3.0) as f64;
-                Rect::new(-radius, -radius, radius, radius)
+            Self::GaussianBlur {
+                std_deviation_x,
+                std_deviation_y,
+                ..
+            } => {
+                // Gaussian blur expands by 3*sigma on each axis (covers 99.7% of distribution).
+                let radius_x = (*std_deviation_x * 3.0) as f64;
+                let radius_y = (*std_deviation_y * 3.0) as f64;
+                Rect::new(-radius_x, -radius_y, radius_x, radius_y)
             }
             Self::Offset { dx, dy } => {
                 // Offset shifts pixels; expand bounds asymmetrically so shifted content isn't cut.
@@ -576,22 +579,24 @@ impl FilterPrimitive {
                 Rect::new(dx.min(0.0), dy.min(0.0), dx.max(0.0), dy.max(0.0))
             }
             Self::DropShadow {
-                std_deviation,
+                std_deviation_x,
+                std_deviation_y,
                 dx,
                 dy,
                 ..
             } => {
                 // Drop shadow = blur + offset + composite with original
                 // The expansion rect encompasses both the blur and the offset
-                let blur_radius = (*std_deviation * 3.0) as f64;
+                let blur_radius_x = (*std_deviation_x * 3.0) as f64;
+                let blur_radius_y = (*std_deviation_y * 3.0) as f64;
                 let dx = *dx as f64;
                 let dy = *dy as f64;
 
                 Rect::new(
-                    -(blur_radius + (-dx).max(0.0)),
-                    -(blur_radius + (-dy).max(0.0)),
-                    blur_radius + dx.max(0.0),
-                    blur_radius + dy.max(0.0),
+                    -(blur_radius_x + (-dx).max(0.0)),
+                    -(blur_radius_y + (-dy).max(0.0)),
+                    blur_radius_x + dx.max(0.0),
+                    blur_radius_y + dy.max(0.0),
                 )
             }
             // Most other filters don't expand bounds

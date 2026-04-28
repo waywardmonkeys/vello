@@ -29,8 +29,8 @@ use vello_common::pixmap::Pixmap;
 
 impl FilterEffect for GaussianBlur {
     fn execute_lowp(&self, pixmap: &mut Pixmap, layer_manager: &mut LayerManager) {
-        // No blur if std_deviation is zero or negative
-        if self.std_deviation <= 0.0 {
+        // No blur if both standard deviations are zero or negative.
+        if self.std_deviation_x <= 0.0 && self.std_deviation_y <= 0.0 {
             return;
         }
 
@@ -38,8 +38,10 @@ impl FilterEffect for GaussianBlur {
         apply_blur(
             pixmap,
             scratch,
-            self.n_decimations,
-            &self.kernel[..usize::from(self.kernel_size)],
+            self.n_decimations_x,
+            self.n_decimations_y,
+            &self.kernel_x[..usize::from(self.kernel_size_x)],
+            &self.kernel_y[..usize::from(self.kernel_size_y)],
             self.edge_mode,
         );
     }
@@ -62,36 +64,71 @@ impl FilterEffect for GaussianBlur {
 pub(crate) fn apply_blur(
     pixmap: &mut Pixmap,
     scratch: &mut Pixmap,
-    n_decimations: usize,
-    kernel: &[f32],
+    n_decimations_x: usize,
+    n_decimations_y: usize,
+    kernel_x: &[f32],
+    kernel_y: &[f32],
     edge_mode: EdgeMode,
 ) {
-    let radius = (kernel.len() / 2) as u8;
+    let radius_x = (kernel_x.len() / 2) as u8;
+    let radius_y = (kernel_y.len() / 2) as u8;
     let width = pixmap.width();
     let height = pixmap.height();
 
     // Small blur: apply direct convolution at full resolution
-    if n_decimations == 0 {
-        convolve(pixmap, scratch, width, height, kernel, radius, edge_mode);
+    if n_decimations_x == 0 && n_decimations_y == 0 {
+        convolve(
+            pixmap, scratch, width, height, kernel_x, radius_x, kernel_y, radius_y, edge_mode,
+        );
         return;
     }
 
     // Track logical dimensions through decimation (physical buffer stays the same size)
     let mut sizer = DecimationSizer::new(width, height);
 
-    // Downsample n times (each step reduces resolution by 2×)
-    for _ in 0..n_decimations {
+    // Preserve the original combined pyramid for levels that both axes share, then apply
+    // axis-specific levels only for the anisotropic remainder.
+    let n_shared_decimations = n_decimations_x.min(n_decimations_y);
+
+    for _ in 0..n_shared_decimations {
         let (w, h) = sizer.current();
         downscale(pixmap, w, h, edge_mode);
         sizer.downscale();
     }
 
+    for _ in n_shared_decimations..n_decimations_x {
+        let (w, h) = sizer.current();
+        downscale_x(pixmap, w, h, w.div_ceil(2), edge_mode);
+        sizer.downscale_x();
+    }
+
+    for _ in n_shared_decimations..n_decimations_y {
+        let (w, h) = sizer.current();
+        downscale_y(pixmap, w, h, h.div_ceil(2), edge_mode);
+        sizer.downscale_y();
+    }
+
     // Apply the reduced blur at the coarsest resolution
     let (w, h) = sizer.current();
-    convolve(pixmap, scratch, w, h, kernel, radius, edge_mode);
+    convolve(
+        pixmap, scratch, w, h, kernel_x, radius_x, kernel_y, radius_y, edge_mode,
+    );
 
-    // Upsample back to original resolution (each step doubles resolution by 2×)
-    for _ in 0..n_decimations {
+    // Upsample the anisotropic remainder first, then use the original combined path for
+    // shared levels so symmetric blurs keep their historical output.
+    for _ in n_shared_decimations..n_decimations_y {
+        let (w, h) = sizer.current();
+        upscale_y(pixmap, w, h, edge_mode);
+        sizer.upscale_y();
+    }
+
+    for _ in n_shared_decimations..n_decimations_x {
+        let (w, h) = sizer.current();
+        upscale_x(pixmap, w, h, edge_mode);
+        sizer.upscale_x();
+    }
+
+    for _ in 0..n_shared_decimations {
         let (w, h) = sizer.current();
         upscale(pixmap, w, h, edge_mode);
         sizer.upscale();
@@ -114,12 +151,14 @@ pub(crate) fn convolve(
     scratch: &mut Pixmap,
     width: u16,
     height: u16,
-    kernel: &[f32],
-    radius: u8,
+    kernel_x: &[f32],
+    radius_x: u8,
+    kernel_y: &[f32],
+    radius_y: u8,
     edge_mode: EdgeMode,
 ) {
-    convolve_x(src, scratch, width, height, kernel, radius, edge_mode);
-    convolve_y(scratch, src, width, height, kernel, radius, edge_mode);
+    convolve_x(src, scratch, width, height, kernel_x, radius_x, edge_mode);
+    convolve_y(scratch, src, width, height, kernel_y, radius_y, edge_mode);
 }
 
 /// Apply horizontal blur pass (1D convolution along x-axis).
@@ -746,6 +785,8 @@ mod tests {
                 &mut pixmap,
                 &mut scratch,
                 n_decimations,
+                n_decimations,
+                &kernel[..usize::from(kernel_size)],
                 &kernel[..usize::from(kernel_size)],
                 EdgeMode::None,
             );

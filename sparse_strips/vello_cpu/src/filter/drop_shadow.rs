@@ -31,9 +31,12 @@ impl FilterEffect for DropShadow {
             pixmap,
             self.dx,
             self.dy,
-            self.std_deviation,
-            self.n_decimations,
-            &self.kernel[..usize::from(self.kernel_size)],
+            self.std_deviation_x,
+            self.std_deviation_y,
+            self.n_decimations_x,
+            self.n_decimations_y,
+            &self.kernel_x[..usize::from(self.kernel_size_x)],
+            &self.kernel_y[..usize::from(self.kernel_size_y)],
             self.color,
             self.edge_mode,
             layer_manager,
@@ -57,9 +60,12 @@ fn apply_drop_shadow(
     pixmap: &mut Pixmap,
     dx: f32,
     dy: f32,
-    std_deviation: f32,
-    n_decimations: usize,
-    kernel: &[f32],
+    std_deviation_x: f32,
+    std_deviation_y: f32,
+    n_decimations_x: usize,
+    n_decimations_y: usize,
+    kernel_x: &[f32],
+    kernel_y: &[f32],
     color: AlphaColor<Srgb>,
     edge_mode: EdgeMode,
     layer_manager: &mut LayerManager,
@@ -71,14 +77,16 @@ fn apply_drop_shadow(
     offset_pixels(&mut shadow_pixmap, dx, dy);
 
     // Step 2: Blur the already-offset shadow
-    if std_deviation > 0.0 {
+    if std_deviation_x > 0.0 || std_deviation_y > 0.0 {
         let scratch =
             layer_manager.get_scratch_buffer(shadow_pixmap.width(), shadow_pixmap.height());
         apply_blur(
             &mut shadow_pixmap,
             scratch,
-            n_decimations,
-            kernel,
+            n_decimations_x,
+            n_decimations_y,
+            kernel_x,
+            kernel_y,
             edge_mode,
         );
     }

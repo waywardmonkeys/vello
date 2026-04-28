@@ -29,12 +29,14 @@ impl ExampleScene for FilterScene {
         let filter_drop_shadow = Filter::from_primitive(FilterPrimitive::DropShadow {
             dx: 20.0,
             dy: 20.0,
-            std_deviation: 4.0,
+            std_deviation_x: 4.0,
+            std_deviation_y: 4.0,
             color: AlphaColor::from_rgba8(255, 255, 255, 128),
             edge_mode: EdgeMode::None,
         });
         let filter_gaussian_blur = Filter::from_primitive(FilterPrimitive::GaussianBlur {
-            std_deviation: 10.0,
+            std_deviation_x: 10.0,
+            std_deviation_y: 10.0,
             edge_mode: EdgeMode::None,
         });
 
@@ -469,14 +471,16 @@ impl ExampleScene for FilterScene {
         top = y;
         {
             ctx.push_filter_layer(Filter::from_primitive(FilterPrimitive::GaussianBlur {
-                std_deviation: 2.0,
+                std_deviation_x: 2.0,
+                std_deviation_y: 2.0,
                 edge_mode: EdgeMode::None,
             }));
             ctx.set_paint(ROYAL_BLUE);
             ctx.fill_rect(&Rect::from_points((left, top), (left + width, top + width)));
             {
                 ctx.push_filter_layer(Filter::from_primitive(FilterPrimitive::GaussianBlur {
-                    std_deviation: 2.0,
+                    std_deviation_x: 2.0,
+                    std_deviation_y: 2.0,
                     edge_mode: EdgeMode::None,
                 }));
                 ctx.set_paint(PURPLE);
@@ -485,7 +489,8 @@ impl ExampleScene for FilterScene {
                 ctx.fill_rect(&Rect::from_points((left, top), (left + width, top + width)));
                 {
                     ctx.push_filter_layer(Filter::from_primitive(FilterPrimitive::GaussianBlur {
-                        std_deviation: 2.0,
+                        std_deviation_x: 2.0,
+                        std_deviation_y: 2.0,
                         edge_mode: EdgeMode::None,
                     }));
                     ctx.set_paint(VIOLET);
@@ -495,7 +500,8 @@ impl ExampleScene for FilterScene {
                     {
                         ctx.push_filter_layer(Filter::from_primitive(
                             FilterPrimitive::GaussianBlur {
-                                std_deviation: 2.0,
+                                std_deviation_x: 2.0,
+                                std_deviation_y: 2.0,
                                 edge_mode: EdgeMode::None,
                             },
                         ));
@@ -506,7 +512,8 @@ impl ExampleScene for FilterScene {
                         {
                             ctx.push_filter_layer(Filter::from_primitive(
                                 FilterPrimitive::GaussianBlur {
-                                    std_deviation: 2.0,
+                                    std_deviation_x: 2.0,
+                                    std_deviation_y: 2.0,
                                     edge_mode: EdgeMode::None,
                                 },
                             ));

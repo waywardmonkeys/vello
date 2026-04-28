@@ -15,6 +15,10 @@ You can find its changes [documented below](#007---2026-03-24).
 
 This release has an [MSRV][] of 1.88.
 
+### Added
+
+- Support for Gaussian blur and drop shadow filters with separate x/y standard deviations.
+
 ## [0.0.7][] - 2026-03-24
 
 This release has an [MSRV][] of 1.92.
